@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod system_tests {
-    use super::*;
     use bayse::{Bayse, SystemManager};
     use tokio::test;
 
