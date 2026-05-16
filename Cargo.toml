@@ -34,4 +34,3 @@ uuid = { version = "1.16.0", features = ["v4"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
-wiremock = "0.6"
