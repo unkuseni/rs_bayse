@@ -31,40 +31,228 @@ pub struct PaginatedResponse<T> {
 }
 
 /// Subscription payload for WebSocket channels.
+///
+/// Use the builder methods to set channel-specific fields. Only the
+/// fields relevant to the target channel need to be populated.
+///
+/// # Examples
+///
+/// ```
+/// use bayse::WsSubscription;
+///
+/// // Subscribe to price updates for an event
+/// let sub = WsSubscription::new("subscribe", "prices")
+///     .with_event_id("event_123");
+///
+/// // Subscribe to order book for multiple markets
+/// let ob = WsSubscription::new("subscribe", "orderbook")
+///     .with_market_ids(vec!["mkt_1".into(), "mkt_2".into()])
+///     .with_currency("USD");
+///
+/// // Subscribe to asset prices
+/// let prices = WsSubscription::new("subscribe", "asset_prices")
+///     .with_symbols(vec!["BTCUSDT".into()]);
+/// ```
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WsSubscription {
-    /// The operation type (e.g. "subscribe", "unsubscribe").
+    /// The operation type: `"subscribe"`, `"unsubscribe"`, or `"ping"`.
     #[serde(rename = "type")]
     pub op: String,
 
-    /// The channel to subscribe to.
-    pub channel: String,
+    /// The channel to subscribe to
+    /// (e.g. `"activity"`, `"prices"`, `"orderbook"`, `"orders"`, `"asset_prices"`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channel: Option<String>,
 
-    /// Optional event ID filter.
+    /// Event UUID filter. Required for `activity` and `prices` channels.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event_id: Option<String>,
+
+    /// Single market UUID filter. Optional for `activity`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub market_id: Option<String>,
+
+    /// Market UUIDs (max 10 per message). Required for `orderbook` and `orders`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub market_ids: Option<Vec<String>>,
+
+    /// Asset symbols (e.g. `["BTCUSDT"]`). Required for `asset_prices`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub symbols: Option<Vec<String>>,
+
+    /// Currency filter: `"USD"` or `"NGN"`. Optional for `orderbook`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub currency: Option<String>,
+
+    /// Room name to unsubscribe from. Required for `unsubscribe`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub room: Option<String>,
+
+    /// User UUID filter. Required for `user_trades` channel.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user_id: Option<String>,
+
+    /// Per-message authentication credentials. Required for `/ws/v1/user`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth: Option<WsAuth>,
 }
 
 impl WsSubscription {
-    /// Create a new subscription message.
+    /// Create a new subscription message for a given channel.
     pub fn new(op: impl Into<String>, channel: impl Into<String>) -> Self {
         Self {
             op: op.into(),
-            channel: channel.into(),
+            channel: Some(channel.into()),
             event_id: None,
+            market_id: None,
+            market_ids: None,
+            symbols: None,
+            currency: None,
+            room: None,
+            user_id: None,
+            auth: None,
         }
     }
 
-    /// Set the event ID filter.
-    pub fn with_event_id(mut self, event_id: String) -> Self {
-        self.event_id = Some(event_id);
+    /// Set the event ID filter (used with `activity` and `prices` channels).
+    pub fn with_event_id(mut self, event_id: impl Into<String>) -> Self {
+        self.event_id = Some(event_id.into());
         self
+    }
+
+    /// Set a single market ID filter (used with `activity` channel).
+    pub fn with_market_id(mut self, market_id: impl Into<String>) -> Self {
+        self.market_id = Some(market_id.into());
+        self
+    }
+
+    /// Set market IDs (used with `orderbook` and `orders` channels).
+    pub fn with_market_ids(mut self, market_ids: Vec<String>) -> Self {
+        self.market_ids = Some(market_ids);
+        self
+    }
+
+    /// Set asset symbols (used with `asset_prices` channel).
+    pub fn with_symbols(mut self, symbols: Vec<String>) -> Self {
+        self.symbols = Some(symbols);
+        self
+    }
+
+    /// Set the currency filter (used with `orderbook` channel).
+    pub fn with_currency(mut self, currency: impl Into<String>) -> Self {
+        self.currency = Some(currency.into());
+        self
+    }
+
+    /// Set the room name (used with `unsubscribe`).
+    pub fn with_room(mut self, room: impl Into<String>) -> Self {
+        self.room = Some(room.into());
+        self
+    }
+
+    /// Set the user ID (used with `user_trades` channel).
+    pub fn with_user_id(mut self, user_id: impl Into<String>) -> Self {
+        self.user_id = Some(user_id.into());
+        self
+    }
+
+    /// Attach authentication credentials (required for `/ws/v1/user`).
+    pub fn with_auth(mut self, auth: WsAuth) -> Self {
+        self.auth = Some(auth);
+        self
+    }
+
+    /// Create a `ping` message for connection keepalive.
+    pub fn ping() -> Self {
+        Self {
+            op: "ping".into(),
+            channel: None,
+            event_id: None,
+            market_id: None,
+            market_ids: None,
+            symbols: None,
+            currency: None,
+            room: None,
+            user_id: None,
+            auth: None,
+        }
+    }
+
+    /// Create an `unsubscribe` message for a specific room.
+    pub fn unsubscribe(room: impl Into<String>) -> Self {
+        Self {
+            op: "unsubscribe".into(),
+            channel: None,
+            event_id: None,
+            market_id: None,
+            market_ids: None,
+            symbols: None,
+            currency: None,
+            room: Some(room.into()),
+            user_id: None,
+            auth: None,
+        }
     }
 }
 
 /// Empty placeholder for API responses with no data.
 #[derive(Serialize, Default, Deserialize, Clone, Debug)]
 pub struct Empty {}
+
+/// Per-message authentication credentials for the `/ws/v1/user` endpoint.
+///
+/// Every message sent to the user WebSocket endpoint must include one of
+/// `api_key` or `access_token`. If both are provided, the access token
+/// takes precedence. The server caches the last verified credential per
+/// connection so repeated messages with the same value skip the auth call.
+///
+/// # Examples
+///
+/// ```
+/// use bayse::WsAuth;
+///
+/// // Authenticate with an API key
+/// let auth = WsAuth::with_api_key("pk_live_...");
+///
+/// // Authenticate with an access token
+/// let auth = WsAuth::with_access_token("eyJ...", Some("device-123"));
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WsAuth {
+    /// Public API key for relay trading clients.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<String>,
+
+    /// JWT access token. Takes precedence over `api_key` when both are set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub access_token: Option<String>,
+
+    /// Optional device identifier sent alongside the access token.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub device_id: Option<String>,
+}
+
+impl WsAuth {
+    /// Create auth credentials from an API public key.
+    pub fn with_api_key(api_key: impl Into<String>) -> Self {
+        Self {
+            api_key: Some(api_key.into()),
+            access_token: None,
+            device_id: None,
+        }
+    }
+
+    /// Create auth credentials from a JWT access token, optionally with a device ID.
+    pub fn with_access_token(access_token: impl Into<String>, device_id: Option<String>) -> Self {
+        Self {
+            api_key: None,
+            access_token: Some(access_token.into()),
+            device_id,
+        }
+    }
+}
 
 /// A generic API response wrapper used by several endpoints.
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -1,18 +1,23 @@
 //! # WebSocket API Examples for Bayse Markets
 //!
-//! Demonstrates how to subscribe to real-time data streams.
+//! Demonstrates how to subscribe to real-time data streams using the typed
+//! [`WsEvent`] API.
 //!
 //! ## Running
 //!
 //! ```bash
-//! # Market data stream
-//! cargo run --example websocket market
+//! # Market data stream (price updates)
+//! cargo run --example websocket market <EVENT_ID> <DURATION>
 //!
-//! # Asset prices stream
-//! cargo run --example websocket realtime
+//! # Realtime asset prices
+//! cargo run --example websocket realtime <DURATION>
+//!
+//! # User order updates (requires BAYSE_API_KEY)
+//! BAYSE_API_KEY="pk_live_..." cargo run --example websocket user <DURATION>
 //! ```
 
 use bayse::prelude::*;
+use bayse::ws::WsEvent;
 use std::env;
 use tokio::time::Duration;
 
@@ -48,19 +53,34 @@ async fn run_with_timeout(duration_secs: u64, fut: impl std::future::Future<Outp
 }
 
 // ---------------------------------------------------------------------------
-// Demo 1 – Market data stream
+// Demo 1 — Market data stream (price updates for an event)
 // ---------------------------------------------------------------------------
 async fn demo_market(event_id: &str, duration: u64) {
     println!("▶ Subscribing to market data for event {event_id} …");
     let ws: Stream = Bayse::new(None, None);
-    let event_id_owned = event_id.to_owned();
+    let event_id = event_id.to_owned();
 
     run_with_timeout(duration, async move {
-        let sub = WsSubscription::new("subscribe", "prices").with_event_id(event_id_owned);
+        let sub = WsSubscription::new("subscribe", "prices").with_event_id(&event_id);
         let _ = ws
-            .subscribe_market(sub, |msg| {
-                println!("  Market data: {msg:#?}");
-                Ok::<_, std::io::Error>(())
+            .subscribe_market(sub, |event: WsEvent| {
+                match event {
+                    WsEvent::PriceUpdate(e) => {
+                        println!("  Price update for {}:", e.data.title);
+                        for market in &e.data.markets {
+                            println!(
+                                "    {} — YES: {:.4}, NO: {:.4}",
+                                market.question,
+                                market.prices.get("YES").unwrap_or(&0.0),
+                                market.prices.get("NO").unwrap_or(&0.0),
+                            );
+                        }
+                    }
+                    WsEvent::Connected(_) => println!("  Connected!"),
+                    WsEvent::Pong(_) => {}
+                    other => println!("  Other event: {other:?}"),
+                }
+                Ok(())
             })
             .await;
     })
@@ -68,25 +88,35 @@ async fn demo_market(event_id: &str, duration: u64) {
 }
 
 // ---------------------------------------------------------------------------
-// Demo 2 – User order stream (requires API key)
+// Demo 2 — User order stream (requires API key)
 // ---------------------------------------------------------------------------
-async fn demo_user(api_key: &str, _api_secret: &str, duration: u64) {
+async fn demo_user(api_key: &str, market_ids: &[String], duration: u64) {
     println!("▶ Subscribing to user order updates …");
     let ws: Stream = Bayse::new(Some(api_key.into()), None);
+    let auth = WsAuth::with_api_key(api_key);
+    let market_ids = market_ids.to_vec();
 
     run_with_timeout(duration, async move {
-        // Per-message authentication payload — structure depends on Bayse's spec
-        let auth_msg = serde_json::json!({
-            "type": "auth",
-            "apiKey": api_key,
-        })
-        .to_string();
-
-        let sub = WsSubscription::new("subscribe", "orders");
+        let sub = WsSubscription::new("subscribe", "orders")
+            .with_market_ids(market_ids)
+            .with_auth(auth);
         let _ = ws
-            .subscribe_user(auth_msg, sub, |msg| {
-                println!("  User order update: {msg:#?}");
-                Ok::<_, std::io::Error>(())
+            .subscribe_user(sub, |event: WsEvent| {
+                match event {
+                    WsEvent::OrderUpdated(e) => {
+                        println!(
+                            "  Order {} — side={}, filled={}, status={}",
+                            e.data.order_id,
+                            e.data.order.side,
+                            e.data.order.filled_quantity,
+                            e.data.order.status,
+                        );
+                    }
+                    WsEvent::Connected(_) => println!("  Connected!"),
+                    WsEvent::Pong(_) => {}
+                    other => println!("  Other event: {other:?}"),
+                }
+                Ok(())
             })
             .await;
     })
@@ -94,18 +124,26 @@ async fn demo_user(api_key: &str, _api_secret: &str, duration: u64) {
 }
 
 // ---------------------------------------------------------------------------
-// Demo 3 – Realtime asset prices
+// Demo 3 — Realtime asset prices
 // ---------------------------------------------------------------------------
 async fn demo_realtime(duration: u64) {
     println!("▶ Subscribing to realtime asset prices …");
     let ws: Stream = Bayse::new(None, None);
 
     run_with_timeout(duration, async move {
-        let sub = WsSubscription::new("subscribe", "prices");
+        let sub = WsSubscription::new("subscribe", "asset_prices")
+            .with_symbols(vec!["BTCUSDT".into(), "ETHUSDT".into()]);
         let _ = ws
-            .subscribe_realtime(sub, |msg| {
-                println!("  Price update: {msg:#?}");
-                Ok::<_, std::io::Error>(())
+            .subscribe_realtime(sub, |event: WsEvent| {
+                match event {
+                    WsEvent::AssetPrice(e) => {
+                        println!("  {}: ${:.2}", e.data.symbol, e.data.price);
+                    }
+                    WsEvent::Connected(_) => println!("  Connected!"),
+                    WsEvent::Pong(_) => {}
+                    other => println!("  Other event: {other:?}"),
+                }
+                Ok(())
             })
             .await;
     })
@@ -114,19 +152,20 @@ async fn demo_realtime(duration: u64) {
 
 fn print_usage() {
     eprintln!(
-        r#"Usage: cargo run --example websocket <MODE> [EVENT_ID] [DURATION]
+        r#"Usage: cargo run --example websocket <MODE> [ARGS] [DURATION]
 
 Modes:
-  market    – Subscribe to market data feed (default event: "example_event")
-  user      – Subscribe to user order updates (needs BAYSE_API_KEY)
-  realtime  – Subscribe to realtime asset prices
+  market <EVENT_ID> [DURATION]
+      – Subscribe to price updates for an event
+  user <MARKET_IDS...> [DURATION]
+      – Subscribe to user order updates (needs BAYSE_API_KEY)
+  realtime [DURATION]
+      – Subscribe to realtime asset prices (BTC, ETH)
 
-Event ID (for market mode, default: "example_event")
 Duration in seconds (default: 30, 0 = run forever)
 
 Environment:
   BAYSE_API_KEY       API key (required for user mode)
-  BAYSE_API_SECRET    API secret (required for user mode)
 "#,
     );
 }
@@ -149,20 +188,30 @@ async fn main() {
         }
     };
 
-    let event_id = args.get(2).map(|s| s.as_str()).unwrap_or("example_event");
-    let duration: u64 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(30);
-
     match mode {
-        Mode::Market => demo_market(event_id, duration).await,
+        Mode::Market => {
+            let event_id = args.get(2).map(|s| s.as_str()).unwrap_or("example_event");
+            let duration: u64 = args.get(3).and_then(|s| s.parse().ok()).unwrap_or(30);
+            demo_market(event_id, duration).await;
+        }
         Mode::User => {
             let api_key = env::var("BAYSE_API_KEY").unwrap_or_default();
-            let api_secret = env::var("BAYSE_API_SECRET").unwrap_or_default();
             if api_key.is_empty() {
                 eprintln!("BAYSE_API_KEY is required for user mode");
                 std::process::exit(1);
             }
-            demo_user(&api_key, &api_secret, duration).await;
+            // All remaining args (after "user") are market IDs; last may be duration
+            let market_ids: Vec<String> = args[2..]
+                .iter()
+                .filter(|s| s.parse::<u64>().is_err()) // skip duration
+                .cloned()
+                .collect();
+            let duration: u64 = args.last().and_then(|s| s.parse().ok()).unwrap_or(30);
+            demo_user(&api_key, &market_ids, duration).await;
         }
-        Mode::Realtime => demo_realtime(duration).await,
+        Mode::Realtime => {
+            let duration: u64 = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(30);
+            demo_realtime(duration).await;
+        }
     }
 }
