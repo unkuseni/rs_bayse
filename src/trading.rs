@@ -311,6 +311,36 @@ impl TradingManager {
             .await
     }
 
+    /// Amend the price and/or size of up to 20 open CLOB orders in a single
+    /// round-trip.
+    ///
+    /// Each item names an existing `orderId` you own and supplies the new
+    /// `price`, the new total `size`, or both. Orders may belong to different
+    /// markets and events. CLOB-only: any AMM order is rejected per-item with
+    /// `UNSUPPORTED_ENGINE`.
+    ///
+    /// Amend mutates an order in place — preserving time priority when
+    /// possible — instead of cancelling and re-placing.
+    ///
+    /// Self-trade prevention on amend is a fixed server policy:
+    /// **always `CANCEL_OLDEST`**. If the amend would put the order in a
+    /// position that crosses a same-user resting order, the resting crosser
+    /// is cancelled and the amend proceeds.
+    ///
+    /// Requires write-level authentication (HMAC-SHA256).
+    pub async fn batch_amend_orders(
+        &self,
+        req: &BatchAmendOrdersRequest,
+    ) -> Result<BatchAmendOrdersResponse, BayseError> {
+        let body_str = serde_json::to_string(req)?;
+        self.client
+            .post_signed(
+                API::Trading(TradingEndpoint::BatchAmendOrders).as_ref(),
+                Some(body_str),
+            )
+            .await
+    }
+
     // ------------------------------------------------------------------
     // Mint / Burn Shares
     // ------------------------------------------------------------------

@@ -53,6 +53,7 @@ pub enum TradingEndpoint {
     GetOrder,
     CancelOrder,
     BatchCancelOrders,
+    BatchAmendOrders,
     MintShares,
     BurnShares,
     Activities,
@@ -134,6 +135,7 @@ impl AsRef<str> for TradingEndpoint {
             TradingEndpoint::GetOrder => "/v1/pm/orders/", // + {orderId}
             TradingEndpoint::CancelOrder => "/v1/pm/orders/", // + {orderId}
             TradingEndpoint::BatchCancelOrders => "/v1/pm/orders/batch",
+            TradingEndpoint::BatchAmendOrders => "/v1/pm/orders/batch/amend",
             TradingEndpoint::MintShares => "/v1/pm/markets/", // + {marketId}/mint
             TradingEndpoint::BurnShares => "/v1/pm/markets/", // + {marketId}/burn
             TradingEndpoint::Activities => "/v1/pm/activities",

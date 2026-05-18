@@ -1284,6 +1284,66 @@ pub struct BatchCancelOrdersResponse {
 }
 
 // --------------------------------------------------------------------------
+// Batch amend order types
+// --------------------------------------------------------------------------
+
+/// A single amend item in a batch-amend request.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchAmendOrdersItem {
+    /// UUID of the order to amend. Must be owned by the caller.
+    pub order_id: String,
+    /// New limit price per share (0.01–0.99). Absolute, not a delta.
+    /// Omit to keep the order's current price.
+    /// At least one of `newPrice` or `newSize` must be supplied.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_price: Option<f64>,
+    /// New TOTAL size of the order in the order's original currency.
+    /// Must be greater than the order's `filledSize`.
+    /// Omit to keep the order's current size.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub new_size: Option<f64>,
+}
+
+/// Request body for the batch-amend-orders endpoint.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchAmendOrdersRequest {
+    /// 1–20 amend items. Each is processed independently.
+    pub items: Vec<BatchAmendOrdersItem>,
+}
+
+/// Per-item outcome in a batch-amend response.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchAmendResult {
+    /// Position of this item in the request `items` array (zero-based).
+    pub index: u32,
+    /// The order UUID submitted in the request.
+    pub order_id: String,
+    /// `true` if the amend transitioned the order to the new `(price, size)`.
+    pub success: bool,
+    /// The amended CLOB order. Present when `success` is `true`.
+    #[serde(default)]
+    pub order: Option<Order>,
+    /// Error details. Present when `success` is `false`.
+    #[serde(default)]
+    pub error: Option<BatchOrderError>,
+}
+
+/// Response from the batch-amend-orders endpoint.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchAmendOrdersResponse {
+    /// Always `"CLOB"` for batch endpoints.
+    pub engine: String,
+    /// Per-item outcomes in the same order as the request.
+    pub results: Vec<BatchAmendResult>,
+    /// Aggregate counts.
+    pub summary: BatchSummary,
+}
+
+// --------------------------------------------------------------------------
 // Mint / Burn types
 // --------------------------------------------------------------------------
 

@@ -1,6 +1,7 @@
 use bayse::{
-    BatchCancelOrdersRequest, BatchOrderItem, BatchPlaceOrdersRequest, Bayse, GetPnLQuery,
-    GetQuoteRequest, ListOrdersQuery, MintBurnRequest, PlaceOrderRequest, TradingManager,
+    BatchAmendOrdersItem, BatchAmendOrdersRequest, BatchCancelOrdersRequest, BatchOrderItem,
+    BatchPlaceOrdersRequest, Bayse, GetPnLQuery, GetQuoteRequest, ListOrdersQuery, MintBurnRequest,
+    PlaceOrderRequest, TradingManager,
 };
 
 const API_KEY: &str = "";
@@ -282,9 +283,34 @@ async fn test_batch_cancel_orders() {
     }
 }
 
-// ---------------------------------------------------------------------------
+/// ------------------------------------------------------------------
+/// Batch Amend Orders
+/// ------------------------------------------------------------------
+
+#[tokio::test]
+async fn test_batch_amend_orders() {
+    let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
+    let req = BatchAmendOrdersRequest {
+        items: vec![BatchAmendOrdersItem {
+            order_id: "".into(),
+            new_price: Some(0.50),
+            new_size: Some(15.0),
+        }],
+    };
+    match trader.batch_amend_orders(&req).await {
+        Ok(resp) => {
+            println!(
+                "Batch amend: {}/{} succeeded",
+                resp.summary.succeeded, resp.summary.total,
+            );
+        }
+        Err(e) => panic!("{:?}", e),
+    }
+}
+
+// ------------------------------------------------------------------
 // Mint / Burn / Activities
-// ---------------------------------------------------------------------------
+// ------------------------------------------------------------------
 
 #[tokio::test]
 async fn test_mint_shares() {
