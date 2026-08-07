@@ -55,6 +55,7 @@ mod api;
 pub mod client;
 mod config;
 mod errors;
+mod facade;
 mod market_data;
 mod market_maker;
 mod models;
@@ -75,6 +76,7 @@ pub mod prelude {
     pub use crate::client::*;
     pub use crate::config::*;
     pub use crate::errors::*;
+    pub use crate::facade::*;
     pub use crate::market_data::*;
     pub use crate::market_maker::*;
     pub use crate::models::*;

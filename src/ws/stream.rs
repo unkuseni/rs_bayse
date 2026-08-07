@@ -23,6 +23,7 @@ use tokio::sync::mpsc;
 /// | [`subscribe_market`](Self::subscribe_market) | `/ws/v1/markets` | `activity`, `prices`, `orderbook`, `user_trades` | None |
 /// | [`subscribe_user`](Self::subscribe_user) | `/ws/v1/user` | `orders` | Per-message API key/token |
 /// | [`subscribe_realtime`](Self::subscribe_realtime) | `/ws/v1/realtime` | `asset_prices` | None |
+#[derive(Clone)]
 pub struct Stream {
     pub client: Client,
 }

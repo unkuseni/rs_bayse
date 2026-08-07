@@ -415,6 +415,7 @@ pub struct Event {
     /// URL-friendly identifier for the event.
     pub slug: String,
     /// Detailed description of the event.
+    #[serde(default)]
     pub description: String,
     /// Current status of the event (e.g. `"open"`, `"closed"`, `"resolved"`).
     pub status: String,
@@ -426,6 +427,7 @@ pub struct Event {
     /// Trading engine used (`"AMM"` or `"CLOB"`).
     pub engine: String,
     /// ISO 8601 timestamp when the event was created.
+    #[serde(default)]
     pub created_at: String,
     /// ISO 8601 timestamp when the event closes for trading.
     #[serde(default)]
@@ -451,6 +453,30 @@ pub struct Event {
     /// Asset symbol pair associated with the event, if any.
     #[serde(default)]
     pub asset_symbol_pair: Option<String>,
+    /// ISO 8601 timestamp when the event opens for trading. Present on
+    /// time-boxed events (e.g. crypto).
+    #[serde(default)]
+    pub opening_date: Option<String>,
+    /// Threshold range in format `"100-200"`. Present when the event
+    /// covers a price range.
+    #[serde(default)]
+    pub event_threshold_range: Option<String>,
+    /// Closing price at resolution. Present on resolved crypto events.
+    #[serde(default)]
+    pub event_close_value: Option<f64>,
+    /// ID of the sports game. Present on sports events.
+    #[serde(default)]
+    pub sport_game_id: Option<String>,
+    /// Slug of the sports game (e.g. `bm-game-20260524-mci-avl`).
+    #[serde(default)]
+    pub sport_game_slug: Option<String>,
+    /// Type of sports market. Present on sports events. One of
+    /// `TEAM_H2H_3WAY`, `BOTH_TEAMS_TO_SCORE`, `FIRST_TEAM_TO_SCORE`,
+    /// `GOAL_SPREAD`, `TOTAL_GOALS`, `TOTAL_GOALS_HOME`,
+    /// `TOTAL_GOALS_AWAY`, `TOTAL_CORNERS`, `FIRST_HALF_CORNERS`,
+    /// `SECOND_HALF_CORNERS`.
+    #[serde(default)]
+    pub sport_market_type: Option<String>,
     /// List of hashtags associated with the event.
     #[serde(default)]
     pub hashtags: Vec<String>,
@@ -461,8 +487,10 @@ pub struct Event {
     #[serde(default)]
     pub image128_url: String,
     /// Total liquidity in the event's markets.
+    #[serde(default)]
     pub liquidity: f64,
     /// Total number of orders placed in the event.
+    #[serde(default)]
     pub total_orders: u64,
     /// Total trading volume across all markets in the event.
     #[serde(default)]
@@ -545,6 +573,30 @@ pub struct Market {
     /// Threshold value for market resolution, if applicable.
     #[serde(default)]
     pub market_threshold: Option<f64>,
+    /// Threshold range in format `"100-200"`. Present when the market
+    /// covers a price range.
+    #[serde(default)]
+    pub market_threshold_range: Option<String>,
+    /// Closing price at resolution. Present on resolved crypto markets.
+    #[serde(default)]
+    pub market_close_value: Option<f64>,
+    /// The threshold value (e.g. 1.5 goals, 9.5 corners). Present on
+    /// goal and corner prop markets.
+    #[serde(default)]
+    pub prop_line: Option<f64>,
+    /// Directional label: `OVER` for prop markets.
+    #[serde(default)]
+    pub prop_direction: Option<String>,
+    /// Team details for team-specific markets; `None` for match-level
+    /// markets (Total Goals, corners, H2H Draw, …).
+    #[serde(default)]
+    pub prop_team: Option<Value>,
+    /// UUID of the resolved outcome. Present when the market is resolved.
+    #[serde(default)]
+    pub resolved_outcome_id: Option<String>,
+    /// Minimum order amount for this market in the requested currency.
+    #[serde(default)]
+    pub minimum_order_amount: Option<f64>,
     /// Rules text for the market.
     #[serde(default)]
     pub rules: String,
@@ -1497,4 +1549,425 @@ pub struct GetQuoteResponse {
     pub complete_fill: bool,
     /// Whether this trade exceeds maximum liability limits.
     pub trade_goes_over_max_liability: bool,
+}
+
+// --------------------------------------------------------------------------
+// Friendly typed response types
+// --------------------------------------------------------------------------
+//
+// High-level, tolerant typed views of endpoints that otherwise return raw
+// `serde_json::Value`. Every field is `#[serde(default)]` so a single
+// unexpected field never breaks parsing.
+
+/// Public profile of a Bayse user (lookup-user endpoint).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct UserProfile {
+    /// The user's unique ID (UUID).
+    #[serde(default)]
+    pub id: String,
+    /// The user's tag (username).
+    #[serde(default)]
+    pub tag: String,
+    /// URL of the user's profile image. Empty if none is set.
+    #[serde(default)]
+    pub image_url: String,
+}
+
+/// Current market statistics for a single outcome (ticker endpoint).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Ticker {
+    /// UUID of the market.
+    pub market_id: String,
+    /// The outcome label (`YES` or `NO`).
+    pub outcome: String,
+    /// Most recent traded price.
+    pub last_price: f64,
+    /// Highest current bid.
+    pub best_bid: f64,
+    /// Lowest current ask.
+    pub best_ask: f64,
+    /// Midpoint between best bid and ask.
+    pub mid_price: f64,
+    /// Bid–ask spread.
+    pub spread: f64,
+    /// Volume over the last 24 hours.
+    pub volume_24h: f64,
+    /// Highest price over the last 24 hours.
+    pub high_24h: f64,
+    /// Lowest price over the last 24 hours.
+    pub low_24h: f64,
+    /// Price change over the last 24 hours.
+    pub price_change_24h: f64,
+    /// Number of trades over the last 24 hours.
+    pub trade_count_24h: u64,
+    /// ISO 8601 timestamp of the statistics snapshot.
+    pub timestamp: String,
+}
+
+/// A single executed trade (trades endpoint).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Trade {
+    /// UUID of the trade.
+    #[serde(default)]
+    pub id: String,
+    /// UUID of the market the trade belongs to.
+    #[serde(default)]
+    pub market_id: String,
+    /// The traded outcome (`YES` or `NO`).
+    #[serde(default)]
+    pub outcome: String,
+    /// Execution price per share.
+    #[serde(default)]
+    pub price: f64,
+    /// Number of shares traded.
+    #[serde(default)]
+    pub size: f64,
+    /// ISO 8601 timestamp of the trade.
+    #[serde(default)]
+    pub created_at: String,
+}
+
+/// One price level in an order book.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct OrderBookLevel {
+    /// Price per share.
+    pub price: f64,
+    /// Number of shares at this level.
+    pub quantity: f64,
+    /// Notional value (price × quantity).
+    pub total: f64,
+}
+
+/// An order book snapshot for one outcome (order-book endpoint).
+///
+/// The endpoint returns an array of these — one per requested outcome.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct OrderBook {
+    /// UUID of the market this book belongs to.
+    pub market_id: String,
+    /// UUID of the outcome this book is for.
+    pub outcome_id: String,
+    /// ISO 8601 timestamp of the snapshot.
+    pub timestamp: String,
+    /// Buy orders sorted by price (highest first).
+    pub bids: Vec<OrderBookLevel>,
+    /// Sell orders sorted by price (lowest first).
+    pub asks: Vec<OrderBookLevel>,
+    /// Last traded price for this outcome, if available.
+    #[serde(default)]
+    pub last_traded_price: Option<f64>,
+    /// Side of the last trade (`BUY`/`SELL`), if available.
+    #[serde(default)]
+    pub last_traded_side: Option<String>,
+}
+
+/// A single historical price point (price-history endpoint).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct PricePoint {
+    /// The outcome this price belongs to (`YES` or `NO`).
+    #[serde(default)]
+    pub outcome: String,
+    /// Price at this timestamp.
+    #[serde(default)]
+    pub price: f64,
+    /// ISO 8601 timestamp of this point.
+    #[serde(default)]
+    pub timestamp: String,
+}
+
+/// An event series (list-series endpoint).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct EventSeries {
+    /// UUID of the series.
+    #[serde(default)]
+    pub id: String,
+    /// Unique slug identifier (e.g. `crypto-btc-1h`).
+    #[serde(default)]
+    pub slug: String,
+    /// Human-readable name for the series.
+    #[serde(default)]
+    pub display_name: String,
+    /// Description of the series.
+    #[serde(default)]
+    pub description: String,
+    /// Category (e.g. `CRYPTO`).
+    #[serde(default)]
+    pub category: String,
+    /// Time interval between events: `FIFTEEN_MINUTE`, `HOURLY`,
+    /// `SIX_HOURLY`, or `DAILY`.
+    #[serde(default)]
+    pub interval_type: String,
+    /// Asset symbol (e.g. `BTC`, `ETH`, `SOL`).
+    #[serde(default)]
+    pub asset_symbol: String,
+    /// Automation type identifier.
+    #[serde(default)]
+    pub automation_type: String,
+    /// URL to the series icon.
+    #[serde(default)]
+    pub icon_url: String,
+}
+
+/// Response from the list-series endpoint.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ListSeriesResponse {
+    /// List of event series.
+    pub series: Vec<EventSeries>,
+    /// Pagination metadata.
+    pub pagination: Pagination,
+}
+
+/// A lightweight event summary in a series (get-series-events endpoint).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SeriesEventSummary {
+    /// UUID of the event.
+    #[serde(default)]
+    pub id: String,
+    /// Event title.
+    #[serde(default)]
+    pub title: String,
+    /// ISO 8601 — when the event opens for trading.
+    #[serde(default)]
+    pub opening_date: String,
+    /// ISO 8601 — when trading closes.
+    #[serde(default)]
+    pub closing_date: String,
+    /// ISO 8601 — when the outcome is determined.
+    #[serde(default)]
+    pub resolution_date: String,
+}
+
+/// A sports team (sports endpoints).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SportsTeam {
+    /// Unique identifier for the team.
+    #[serde(default)]
+    pub id: String,
+    /// Sport type (e.g. `soccer`, `basketball`).
+    #[serde(default)]
+    pub sport: String,
+    /// Full team name.
+    #[serde(default)]
+    pub name: String,
+    /// URL-friendly team identifier.
+    #[serde(default)]
+    pub slug: String,
+    /// Team short code.
+    #[serde(default)]
+    pub short_code: String,
+    /// League name.
+    #[serde(default)]
+    pub league: String,
+    /// URL to the team logo, if available.
+    #[serde(default)]
+    pub image_url: Option<String>,
+    /// Whether this is a popular/featured team.
+    #[serde(default)]
+    pub is_popular: bool,
+}
+
+/// A supported sports league (list-sports-leagues endpoint).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SportsLeague {
+    /// Full league name (e.g. `England - Premier League`).
+    #[serde(default)]
+    pub name: String,
+    /// Short display name (e.g. `EPL`).
+    #[serde(default)]
+    pub short_name: String,
+    /// URL to the league logo.
+    #[serde(default)]
+    pub image_url: Option<String>,
+}
+
+/// A sports game (list-sports-games endpoint).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SportsGame {
+    /// Unique identifier for the game.
+    #[serde(default)]
+    pub id: String,
+    /// Slug (e.g. `bm-game-20260413-rma-ath`).
+    #[serde(default)]
+    pub slug: String,
+    /// Sport type (e.g. `soccer`, `basketball`).
+    #[serde(default)]
+    pub sport: String,
+    /// ID of the home team.
+    #[serde(default)]
+    pub home_team_id: String,
+    /// ID of the away team.
+    #[serde(default)]
+    pub away_team_id: String,
+    /// Start date of the game.
+    #[serde(default)]
+    pub start_date: String,
+    /// League name.
+    #[serde(default)]
+    pub league: String,
+    /// Whether the game is currently live (tolerant: bool or string).
+    #[serde(default)]
+    pub is_live: Option<Value>,
+    /// Whether this is a popular/featured game.
+    #[serde(default)]
+    pub is_popular: bool,
+    /// Home team details.
+    #[serde(default)]
+    pub home_team: Option<SportsTeam>,
+    /// Away team details.
+    #[serde(default)]
+    pub away_team: Option<SportsTeam>,
+}
+
+/// Response from the list-sports-games endpoint.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SportsGamesResponse {
+    /// Games matching the filter criteria.
+    pub games: Vec<SportsGame>,
+    /// Pagination metadata.
+    pub pagination: Pagination,
+}
+
+/// Response from the list-sports-teams endpoint.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SportsTeamsResponse {
+    /// Teams matching the filter criteria.
+    pub teams: Vec<SportsTeam>,
+    /// Pagination metadata.
+    pub pagination: Pagination,
+}
+
+/// Response from the list-sports-leagues endpoint.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SportsLeaguesResponse {
+    /// Supported sports leagues.
+    pub leagues: Vec<SportsLeague>,
+}
+
+/// A single activity record (activities endpoint).
+///
+/// Numeric fields (`amount`, `fee`, `size`, `price`, …) are kept as
+/// `String` because the API returns them as decimal strings.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Activity {
+    /// Activity ID.
+    pub id: String,
+    /// Activity type (e.g. `BUY_MARKET_ORDER_CREATED`, `PAYOUT_WIN`).
+    #[serde(rename = "type")]
+    pub activity_type: String,
+    /// Event ID.
+    #[serde(default)]
+    pub event_id: Option<String>,
+    /// Market ID.
+    #[serde(default)]
+    pub market_id: Option<String>,
+    /// Outcome ID.
+    #[serde(default)]
+    pub outcome_id: Option<String>,
+    /// Order ID (limit orders).
+    #[serde(default)]
+    pub order_id: Option<String>,
+    /// Settlement ID (payouts).
+    #[serde(default)]
+    pub settlement_id: Option<String>,
+    /// Transaction ID.
+    #[serde(default)]
+    pub transaction_id: Option<String>,
+    /// Event type.
+    #[serde(default)]
+    pub event_type: Option<String>,
+    /// Event title.
+    #[serde(default)]
+    pub event_title: Option<String>,
+    /// Market title.
+    #[serde(default)]
+    pub market_title: Option<String>,
+    /// Outcome name (`YES` / `NO`).
+    #[serde(default)]
+    pub outcome: Option<String>,
+    /// Resolved outcome (payout activities).
+    #[serde(default)]
+    pub resolved_outcome: Option<String>,
+    /// Currency code (`USD`, `NGN`).
+    #[serde(default)]
+    pub currency: Option<String>,
+    /// Order amount (decimal string).
+    #[serde(default)]
+    pub amount: Option<String>,
+    /// Fee charged (decimal string).
+    #[serde(default)]
+    pub fee: Option<String>,
+    /// Number of shares (decimal string).
+    #[serde(default)]
+    pub size: Option<String>,
+    /// Filled share quantity (limit orders).
+    #[serde(default)]
+    pub filled_size: Option<String>,
+    /// Remaining share quantity (limit orders).
+    #[serde(default)]
+    pub remaining_size: Option<String>,
+    /// Order price (decimal string).
+    #[serde(default)]
+    pub price: Option<String>,
+    /// Average fill price (limit orders).
+    #[serde(default)]
+    pub avg_fill_price: Option<String>,
+    /// Total cost of the order.
+    #[serde(default)]
+    pub total_cost: Option<String>,
+    /// Currency base multiplier (decimal string).
+    #[serde(default)]
+    pub currency_base_multiplier: Option<String>,
+    /// Order status.
+    #[serde(default)]
+    pub status: Option<String>,
+    /// Expiration timestamp (GTD limit orders).
+    #[serde(default)]
+    pub expires_at: Option<String>,
+    /// Payout amount (`PAYOUT_WIN`).
+    #[serde(default)]
+    pub payout: Option<String>,
+    /// Amount spent before cancellation/expiry (buy limit orders).
+    #[serde(default)]
+    pub amount_spent: Option<String>,
+    /// Amount refunded on cancellation/expiry (buy limit orders).
+    #[serde(default)]
+    pub amount_refunded: Option<String>,
+    /// Amount earned before cancellation/expiry (sell limit orders).
+    #[serde(default)]
+    pub amount_earned: Option<String>,
+    /// Shares returned on cancellation/expiry (sell limit orders).
+    #[serde(default)]
+    pub shares_returned: Option<String>,
+    /// ISO 8601 timestamp of creation.
+    #[serde(default)]
+    pub created_at: String,
+    /// ISO 8601 timestamp of last update.
+    #[serde(default)]
+    pub updated_at: String,
+}
+
+/// Response from the activities endpoint.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivitiesResponse {
+    /// List of activities.
+    pub activities: Vec<Activity>,
+    /// Pagination metadata.
+    pub pagination: Pagination,
 }

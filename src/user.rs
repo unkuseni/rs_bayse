@@ -47,13 +47,13 @@ impl UserManager {
     ///
     /// # Returns
     ///
-    /// A JSON object with the user's public profile fields (`id`, `tag`,
-    /// `imageUrl`), or an error if the query does not match any known user.
+    /// A typed [`UserProfile`] with the user's public `id`, `tag`, and
+    /// `image_url`, or an error if the query does not match any known user.
     pub async fn lookup_user(
         &self,
         tag: Option<&str>,
         user_id: Option<&str>,
-    ) -> Result<serde_json::Value, BayseError> {
+    ) -> Result<UserProfile, BayseError> {
         let mut params = BTreeMap::new();
         if let Some(t) = tag {
             params.insert("tag".to_string(), t.to_string());

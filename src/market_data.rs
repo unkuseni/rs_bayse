@@ -52,8 +52,7 @@ impl MarketDataManager {
     ///
     /// # Returns
     ///
-    /// A JSON object containing an array of price candles, each with
-    /// `open`, `high`, `low`, `close`, `volume`, and `timestamp` fields.
+    /// A map of market IDs to their [`PricePoint`] history arrays.
     ///
     /// # Examples
     ///
@@ -69,7 +68,9 @@ impl MarketDataManager {
     ///         None,
     ///         Some("YES"),
     ///     ).await?;
-    ///     println!("{history:#?}");
+    ///     for (market_id, points) in &history {
+    ///         println!("{market_id}: {} points", points.len());
+    ///     }
     ///     Ok(())
     /// }
     /// ```
@@ -79,7 +80,7 @@ impl MarketDataManager {
         time_period: Option<&str>,
         market_ids: Option<&[&str]>,
         outcome: Option<&str>,
-    ) -> Result<serde_json::Value, BayseError> {
+    ) -> Result<BTreeMap<String, Vec<PricePoint>>, BayseError> {
         let mut params = BTreeMap::new();
         if let Some(tp) = time_period {
             params.insert("timePeriod".to_string(), tp.to_string());
@@ -111,14 +112,31 @@ impl MarketDataManager {
     ///
     /// # Returns
     ///
-    /// A JSON object containing bid and ask arrays for each requested
-    /// market, with each level showing `price`, `size`, and `order_count`.
+    /// An array of [`OrderBook`] snapshots — one per requested outcome.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use bayse::prelude::*;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), BayseError> {
+    ///     let md = MarketDataManager::new(None, None);
+    ///     let books = md.get_order_book(&["outcome_1"], Some(5), None).await?;
+    ///     for book in &books {
+    ///         let best_bid = book.bids.first();
+    ///         let best_ask = book.asks.first();
+    ///         println!("{}: bid={:?} ask={:?}", book.market_id, best_bid, best_ask);
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn get_order_book(
         &self,
         outcome_ids: &[&str],
         depth: Option<u32>,
         currency: Option<&str>,
-    ) -> Result<serde_json::Value, BayseError> {
+    ) -> Result<Vec<OrderBook>, BayseError> {
         let mut params = BTreeMap::new();
         params.insert("outcomeId[]".to_string(), outcome_ids.join(","));
         if let Some(d) = depth {
@@ -150,14 +168,27 @@ impl MarketDataManager {
     ///
     /// # Returns
     ///
-    /// A JSON object with `price`, `change`, `volume`, `high`, `low`,
-    /// and `timestamp` fields for the given market.
+    /// A typed [`Ticker`] with price, volume, and 24h statistics.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use bayse::prelude::*;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), BayseError> {
+    ///     let md = MarketDataManager::new(None, None);
+    ///     let ticker = md.get_ticker("market_id", Some("YES"), None).await?;
+    ///     println!("last={} spread={}", ticker.last_price, ticker.spread);
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn get_ticker(
         &self,
         market_id: &str,
         outcome: Option<&str>,
         outcome_id: Option<&str>,
-    ) -> Result<serde_json::Value, BayseError> {
+    ) -> Result<Ticker, BayseError> {
         let mut params = BTreeMap::new();
         if let Some(o) = outcome {
             params.insert("outcome".to_string(), o.to_string());
@@ -182,12 +213,33 @@ impl MarketDataManager {
     ///
     /// # Returns
     ///
-    /// A JSON object containing an array of recent trades, each with
-    /// `market_id`, `side`, `price`, `size`, `timestamp`, and `trade_id`.
+    /// A paginated [`Trade`] list, most recent first.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use bayse::prelude::*;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), BayseError> {
+    ///     let md = MarketDataManager::new(None, None);
+    ///     let trades = md
+    ///         .get_trades(&TradesQuery {
+    ///             page: Some(1),
+    ///             size: Some(20),
+    ///             ..Default::default()
+    ///         })
+    ///         .await?;
+    ///     for trade in &trades.data {
+    ///         println!("{} {} @ {}", trade.market_id, trade.outcome, trade.price);
+    ///     }
+    ///     Ok(())
+    /// }
+    /// ```
     pub async fn get_trades(
         &self,
         query: &TradesQuery,
-    ) -> Result<serde_json::Value, BayseError> {
+    ) -> Result<PaginatedResponse<Trade>, BayseError> {
         let qs = query.to_query_string();
         self.client
             .get(

@@ -62,7 +62,7 @@ impl TradingManager {
 
     /// Get a specific prediction market event by ID.
     ///
-    /// Returns the full event object including all markets, outcomes, and
+    /// Returns the full [`Event`] including all markets, outcomes, and
     /// metadata for the given event UUID.
     ///
     /// **Auth level:** Read (requires `X-Public-Key` header).
@@ -70,7 +70,7 @@ impl TradingManager {
     /// # Parameters
     ///
     /// * `event_id` – The UUID of the event to retrieve.
-    pub async fn get_event(&self, event_id: &str) -> Result<serde_json::Value, BayseError> {
+    pub async fn get_event(&self, event_id: &str) -> Result<Event, BayseError> {
         let endpoint = format!("/v1/pm/events/{event_id}");
         self.client.get_read(&endpoint, None).await
     }
@@ -86,7 +86,7 @@ impl TradingManager {
     /// # Parameters
     ///
     /// * `slug` – The URL slug of the event.
-    pub async fn get_event_by_slug(&self, slug: &str) -> Result<serde_json::Value, BayseError> {
+    pub async fn get_event_by_slug(&self, slug: &str) -> Result<Event, BayseError> {
         let endpoint = format!("/v1/pm/events/slug/{slug}");
         self.client.get_read(&endpoint, None).await
     }
@@ -103,7 +103,7 @@ impl TradingManager {
         &self,
         page: Option<u32>,
         size: Option<u32>,
-    ) -> Result<serde_json::Value, BayseError> {
+    ) -> Result<ListSeriesResponse, BayseError> {
         let mut params = BTreeMap::new();
         if let Some(p) = page {
             params.insert("page".to_string(), p.to_string());
@@ -136,7 +136,7 @@ impl TradingManager {
         series_slug: &str,
         page: Option<u32>,
         size: Option<u32>,
-    ) -> Result<serde_json::Value, BayseError> {
+    ) -> Result<Vec<SeriesEventSummary>, BayseError> {
         let mut params = BTreeMap::new();
         if let Some(p) = page {
             params.insert("page".to_string(), p.to_string());
@@ -386,7 +386,7 @@ impl TradingManager {
     /// Get your trading activity history.
     ///
     /// Returns a paginated list of past trades, deposits, withdrawals, and
-    /// other account activity.
+    /// other account activity as typed [`Activity`] records.
     ///
     /// **Auth level:** Read (requires `X-Public-Key` header).
     ///
@@ -402,7 +402,7 @@ impl TradingManager {
         activity_type: Option<&str>,
         page: Option<u32>,
         size: Option<u32>,
-    ) -> Result<serde_json::Value, BayseError> {
+    ) -> Result<ActivitiesResponse, BayseError> {
         let mut params = BTreeMap::new();
         if let Some(t) = activity_type {
             params.insert("type".to_string(), t.to_string());
@@ -440,7 +440,7 @@ impl TradingManager {
         sport: Option<&str>,
         page: Option<u32>,
         size: Option<u32>,
-    ) -> Result<serde_json::Value, BayseError> {
+    ) -> Result<SportsGamesResponse, BayseError> {
         let mut params = BTreeMap::new();
         if let Some(l) = league {
             params.insert("league".to_string(), l.to_string());
@@ -461,7 +461,7 @@ impl TradingManager {
     /// Get a list of all supported sports leagues.
     ///
     /// **Auth level:** None (public endpoint).
-    pub async fn list_sports_leagues(&self) -> Result<serde_json::Value, BayseError> {
+    pub async fn list_sports_leagues(&self) -> Result<SportsLeaguesResponse, BayseError> {
         self.client.get("/v1/pm/sports/leagues", None).await
     }
 
@@ -482,7 +482,7 @@ impl TradingManager {
         sport: Option<&str>,
         page: Option<u32>,
         size: Option<u32>,
-    ) -> Result<serde_json::Value, BayseError> {
+    ) -> Result<SportsTeamsResponse, BayseError> {
         let mut params = BTreeMap::new();
         if let Some(l) = league {
             params.insert("league".to_string(), l.to_string());

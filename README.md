@@ -12,6 +12,7 @@
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
 - [Configuration](#configuration)
+- [Friendly API](#friendly-api)
 - [Usage](#usage)
   - [REST API (Public)](#rest-api-public)
   - [REST API (Authenticated)](#rest-api-authenticated)
@@ -67,6 +68,85 @@ async fn main() -> Result<(), BayseError> {
 
     Ok(())
 }
+```
+
+## Friendly API
+
+If you'd rather skip the boilerplate, use the [`BayseClient`] facade. It
+bundles every manager into one object and returns **typed data** instead of
+raw JSON — no digging through `serde_json::Value`.
+
+```rust
+use bayse::prelude::*;
+
+#[tokio::main]
+async fn main() -> Result<(), BayseError> {
+    // Public access — no credentials needed
+    let client = BayseClient::public();
+
+    // Typed events (no pagination wrapper to unwrap)
+    let events = client.open_events(Some(5)).await?;
+    println!("{} open events", events.len());
+
+    // Typed ticker, order book, trades, price history
+    let ticker = client
+        .market_data
+        .get_ticker("market_id", Some("YES"), None)
+        .await?;
+    println!("last: {} spread: {}", ticker.last_price, ticker.spread);
+
+    let books = client
+        .market_data
+        .get_order_book(&["outcome_id"], Some(5), None)
+        .await?;
+    for book in &books {
+        println!(
+            "{} — best bid {:?}, best ask {:?}",
+            book.market_id,
+            book.bids.first(),
+            book.asks.first()
+        );
+    }
+
+    // One-call onboarding: login + create API key + wire everything
+    let (client, key) = BayseClient::login_and_create_api_key(
+        "you@example.com",
+        "your-password",
+        "my-trading-bot",
+    )
+    .await?;
+    println!("public key: {}", key.public_key);
+    println!("secret key: {} (store this!)", key.secret_key);
+
+    // Wallet balances as typed assets
+    let balances = client.balances().await?;
+    for asset in &balances {
+        println!(
+            "{} — available {}",
+            asset.symbol, asset.available_balance
+        );
+    }
+
+    Ok(())
+}
+```
+
+**What you get for free:**
+
+- `BayseClient::public()` / `with_api_key()` / `with_session()` — one object
+  with every manager wired up.
+- `BayseClient::login()` / `login_and_create_api_key()` — the multi-step
+  session + API key flows in a single call.
+- `open_events()`, `markets_for()`, `balances()` — combine steps and strip
+  response wrappers.
+- Typed market data: [`Ticker`], [`OrderBook`], [`Trade`], [`PricePoint`],
+  [`UserProfile`], [`EventSeries`], [`SeriesEventSummary`], sports
+  ([`SportsGame`], [`SportsTeam`], [`SportsLeague`]), and [`Activity`].
+
+Run the full walkthrough with:
+
+```bash
+cargo run --example friendly
 ```
 
 ## Prerequisites
@@ -282,11 +362,15 @@ pub trait Bayse {
 Check the [examples](examples/) directory:
 
 - [`rest_api.rs`](examples/rest_api.rs) — Demonstrates public and authenticated REST endpoints
+- [`friendly.rs`](examples/friendly.rs) — Demonstrates the `BayseClient` facade with typed data helpers
 - [`websocket.rs`](examples/websocket.rs) — Demonstrates WebSocket subscriptions
 
 ```bash
 # Run REST API examples
 cargo run --example rest_api
+
+# Run the friendly facade example
+cargo run --example friendly
 
 # Run WebSocket examples
 cargo run --example websocket market
