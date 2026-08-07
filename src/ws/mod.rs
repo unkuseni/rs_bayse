@@ -118,9 +118,7 @@ impl WsEvent {
             "unsubscribed" => Ok(WsEvent::Unsubscribed(serde_json::from_value(v)?)),
             "pong" => Ok(WsEvent::Pong(serde_json::from_value(v)?)),
             "error" => Ok(WsEvent::Error(serde_json::from_value(v)?)),
-            other => {
-                return Err(BayseError::Base(format!("unknown WsEvent type: {other}")));
-            }
+            other => Err(BayseError::Base(format!("unknown WsEvent type: {other}"))),
         }
     }
 }

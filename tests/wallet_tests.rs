@@ -16,7 +16,7 @@ async fn test_get_assets() {
             println!("Assets: {:#?}", assets);
         }
         Err(err) => {
-            assert!(false, "Failed to get assets: {:?}", err);
+            panic!("Failed to get assets: {:?}", err);
         }
     }
 }
