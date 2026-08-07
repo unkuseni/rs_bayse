@@ -1,5 +1,9 @@
 use bayse::{Bayse, UserManager};
 
+// NOTE: These are live integration tests against the production Bayse API.
+// They are ignored by default so `cargo test` stays hermetic; run them with
+// real credentials via:
+//     cargo test --test user_tests -- --ignored
 const API_KEY: &str = "";
 const SECRET_KEY: &str = "";
 
@@ -7,17 +11,13 @@ const TEST_EMAIL: &str = "johndoe@example.com";
 const TEST_PASSWORD: &str = "password123";
 
 #[tokio::test]
+#[ignore]
 async fn test_lookup_user() {
-    let mut manager = UserManager::new(Some(API_KEY.to_string()), Some(SECRET_KEY.to_string()));
+    // lookup_user requires read authentication (X-Public-Key header) —
+    // no login is needed, just a valid API key.
+    let manager = UserManager::new(Some(API_KEY.to_string()), Some(SECRET_KEY.to_string()));
 
-    // lookup_user requires a session, so log in first.
-    // login() already persists the session token on the client.
-    manager
-        .login(TEST_EMAIL, TEST_PASSWORD)
-        .await
-        .expect("login should succeed");
-
-    match manager.lookup_user("janedoe").await {
+    match manager.lookup_user(Some("janedoe"), None).await {
         Ok(user) => {
             println!("User: {:#?}", user);
         }
@@ -26,6 +26,7 @@ async fn test_lookup_user() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_login() {
     let mut manager = UserManager::new(Some(API_KEY.to_string()), Some(SECRET_KEY.to_string()));
     match manager.login(TEST_EMAIL, TEST_PASSWORD).await {
@@ -37,6 +38,7 @@ async fn test_login() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_create_api_key() {
     let mut manager = UserManager::new(Some(API_KEY.to_string()), Some(SECRET_KEY.to_string()));
     match manager
@@ -51,6 +53,7 @@ async fn test_create_api_key() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_list_api_keys() {
     let mut manager = UserManager::new(Some(API_KEY.to_string()), Some(SECRET_KEY.to_string()));
 
@@ -69,6 +72,7 @@ async fn test_list_api_keys() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_revoke_api_key() {
     // Create a throwaway key, capture its ID, then revoke it.
     // login_and_create_api_key handles both login + key creation,
@@ -90,6 +94,7 @@ async fn test_revoke_api_key() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_rotate_api_key() {
     // Create a throwaway key, capture its ID, then rotate its secret.
     let mut manager = UserManager::new(Some(API_KEY.to_string()), Some(SECRET_KEY.to_string()));

@@ -467,7 +467,11 @@ fn test_subscription_command_subscribe_serialises() {
 
 /// Connect to the realtime endpoint, subscribe to BTCUSDT, read one
 /// message, and disconnect.  This exercises the full WsClient lifecycle.
+///
+/// Requires network access to the live Bayse WebSocket endpoint, so it is
+/// ignored by default; run with `cargo test -- --ignored`.
 #[tokio::test]
+#[ignore]
 async fn test_live_connect_and_disconnect() {
     let ws_host = std::env::var("BAYSE_WS_HOST").unwrap_or_else(|_| WS_HOST.to_string());
     let api_key = std::env::var("BAYSE_API_KEY").unwrap_or_default();

@@ -206,7 +206,7 @@ impl TradingManager {
         self.client.post_signed(&endpoint, Some(body_str)).await
     }
 
-    /// Place up to 50 CLOB orders across one or more markets in a single round-trip.
+    /// Place up to 20 CLOB orders across one or more markets in a single round-trip.
     ///
     /// Orders may span multiple markets and events — each item carries only
     /// `outcome_id`, and the server resolves the parent market and event.
@@ -392,14 +392,21 @@ impl TradingManager {
     ///
     /// # Parameters
     ///
+    /// * `activity_type` – Optional filter: `buys`, `sells`, `limits`, or
+    ///   `payout`. When omitted, all activity types except trade fills
+    ///   are returned.
     /// * `page` – Optional page number (1-based). Defaults to 1.
     /// * `size` – Optional number of activities per page.
     pub async fn get_activities(
         &self,
+        activity_type: Option<&str>,
         page: Option<u32>,
         size: Option<u32>,
     ) -> Result<serde_json::Value, BayseError> {
         let mut params = BTreeMap::new();
+        if let Some(t) = activity_type {
+            params.insert("type".to_string(), t.to_string());
+        }
         if let Some(p) = page {
             params.insert("page".to_string(), p.to_string());
         }
@@ -410,5 +417,86 @@ impl TradingManager {
         self.client
             .get_read(API::Trading(TradingEndpoint::Activities).as_ref(), Some(qs))
             .await
+    }
+
+    // ------------------------------------------------------------------
+    // Sports markets
+    // ------------------------------------------------------------------
+
+    /// Get a paginated list of sports games, optionally filtered by league
+    /// or sport.
+    ///
+    /// **Auth level:** None (public endpoint).
+    ///
+    /// # Parameters
+    ///
+    /// * `league` – Optional league key (e.g. `"England - Premier League"`).
+    /// * `sport` – Optional sport (e.g. `"soccer"`, `"basketball"`).
+    /// * `page` – Optional page number (1-based). Defaults to 1.
+    /// * `size` – Optional results per page (default 50, max 100).
+    pub async fn list_sports_games(
+        &self,
+        league: Option<&str>,
+        sport: Option<&str>,
+        page: Option<u32>,
+        size: Option<u32>,
+    ) -> Result<serde_json::Value, BayseError> {
+        let mut params = BTreeMap::new();
+        if let Some(l) = league {
+            params.insert("league".to_string(), l.to_string());
+        }
+        if let Some(s) = sport {
+            params.insert("sport".to_string(), s.to_string());
+        }
+        if let Some(p) = page {
+            params.insert("page".to_string(), p.to_string());
+        }
+        if let Some(sz) = size {
+            params.insert("size".to_string(), sz.to_string());
+        }
+        let qs = build_request(&params);
+        self.client.get("/v1/pm/sports/games", Some(qs)).await
+    }
+
+    /// Get a list of all supported sports leagues.
+    ///
+    /// **Auth level:** None (public endpoint).
+    pub async fn list_sports_leagues(&self) -> Result<serde_json::Value, BayseError> {
+        self.client.get("/v1/pm/sports/leagues", None).await
+    }
+
+    /// Get a paginated list of sports teams, optionally filtered by league
+    /// or sport.
+    ///
+    /// **Auth level:** None (public endpoint).
+    ///
+    /// # Parameters
+    ///
+    /// * `league` – Optional league key (e.g. `"England - Premier League"`).
+    /// * `sport` – Optional sport (e.g. `"soccer"`, `"basketball"`).
+    /// * `page` – Optional page number (1-based). Defaults to 1.
+    /// * `size` – Optional results per page (default 50, max 100).
+    pub async fn list_sports_teams(
+        &self,
+        league: Option<&str>,
+        sport: Option<&str>,
+        page: Option<u32>,
+        size: Option<u32>,
+    ) -> Result<serde_json::Value, BayseError> {
+        let mut params = BTreeMap::new();
+        if let Some(l) = league {
+            params.insert("league".to_string(), l.to_string());
+        }
+        if let Some(s) = sport {
+            params.insert("sport".to_string(), s.to_string());
+        }
+        if let Some(p) = page {
+            params.insert("page".to_string(), p.to_string());
+        }
+        if let Some(sz) = size {
+            params.insert("size".to_string(), sz.to_string());
+        }
+        let qs = build_request(&params);
+        self.client.get("/v1/pm/sports/teams", Some(qs)).await
     }
 }

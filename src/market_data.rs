@@ -43,13 +43,12 @@ impl MarketDataManager {
     /// # Parameters
     ///
     /// * `event_id` – The unique ID of the prediction market event.
-    /// * `from` – Optional start timestamp (Unix milliseconds). If omitted
-    ///   the API defaults to a reasonable look-back window.
-    /// * `to` – Optional end timestamp (Unix milliseconds). Defaults to
-    ///   the current time if omitted.
-    /// * `resolution` – Optional candle width, e.g. `"1m"`, `"5m"`,
-    ///   `"15m"`, `"1h"`, `"1d"`. The server determines the default
-    ///   if not provided.
+    /// * `time_period` – Optional time window: `12H`, `24H`, `1W`, `1M`,
+    ///   or `1Y`. The server defaults to `24H` if omitted.
+    /// * `market_ids` – Optional filter to specific market UUIDs
+    ///   (comma-separated in the request). Omit to return all markets
+    ///   in the event.
+    /// * `outcome` – Optional filter to a specific outcome: `YES` or `NO`.
     ///
     /// # Returns
     ///
@@ -66,9 +65,9 @@ impl MarketDataManager {
     ///     let md = MarketDataManager::new(None, None);
     ///     let history = md.get_price_history(
     ///         "event_123",
+    ///         Some("1W"),
     ///         None,
-    ///         None,
-    ///         Some("1h"),
+    ///         Some("YES"),
     ///     ).await?;
     ///     println!("{history:#?}");
     ///     Ok(())
@@ -77,19 +76,21 @@ impl MarketDataManager {
     pub async fn get_price_history(
         &self,
         event_id: &str,
-        from: Option<i64>,
-        to: Option<i64>,
-        resolution: Option<&str>,
+        time_period: Option<&str>,
+        market_ids: Option<&[&str]>,
+        outcome: Option<&str>,
     ) -> Result<serde_json::Value, BayseError> {
         let mut params = BTreeMap::new();
-        if let Some(f) = from {
-            params.insert("from".to_string(), f.to_string());
+        if let Some(tp) = time_period {
+            params.insert("timePeriod".to_string(), tp.to_string());
         }
-        if let Some(t) = to {
-            params.insert("to".to_string(), t.to_string());
+        if let Some(ids) = market_ids {
+            if !ids.is_empty() {
+                params.insert("marketId[]".to_string(), ids.join(","));
+            }
         }
-        if let Some(r) = resolution {
-            params.insert("resolution".to_string(), r.to_string());
+        if let Some(o) = outcome {
+            params.insert("outcome".to_string(), o.to_string());
         }
         let qs = build_request(&params);
         let endpoint = format!("/v1/pm/events/{event_id}/price-history");
@@ -102,10 +103,11 @@ impl MarketDataManager {
     ///
     /// # Parameters
     ///
-    /// * `market_ids` – One or more market outcome IDs to query
-    ///   (comma-separated in the request).
+    /// * `outcome_ids` – One or more outcome UUIDs to query
+    ///   (sent as `outcomeId[]`, comma-separated in the request).
     /// * `depth` – Optional maximum number of price levels on each side.
-    ///   If omitted the server returns its default depth.
+    ///   The server defaults to 10 if omitted.
+    /// * `currency` – Optional currency for price display: `USD` or `NGN`.
     ///
     /// # Returns
     ///
@@ -113,13 +115,17 @@ impl MarketDataManager {
     /// market, with each level showing `price`, `size`, and `order_count`.
     pub async fn get_order_book(
         &self,
-        market_ids: &[&str],
+        outcome_ids: &[&str],
         depth: Option<u32>,
+        currency: Option<&str>,
     ) -> Result<serde_json::Value, BayseError> {
         let mut params = BTreeMap::new();
-        params.insert("marketIds".to_string(), market_ids.join(","));
+        params.insert("outcomeId[]".to_string(), outcome_ids.join(","));
         if let Some(d) = depth {
             params.insert("depth".to_string(), d.to_string());
+        }
+        if let Some(c) = currency {
+            params.insert("currency".to_string(), c.to_string());
         }
         let qs = build_request(&params);
         self.client
@@ -137,14 +143,31 @@ impl MarketDataManager {
     /// # Parameters
     ///
     /// * `market_id` – The market outcome ID to get the ticker for.
+    /// * `outcome` – The outcome label: `YES` or `NO`. Required if
+    ///   `outcome_id` is not provided.
+    /// * `outcome_id` – UUID of the outcome. Required if `outcome` is
+    ///   not provided.
     ///
     /// # Returns
     ///
     /// A JSON object with `price`, `change`, `volume`, `high`, `low`,
     /// and `timestamp` fields for the given market.
-    pub async fn get_ticker(&self, market_id: &str) -> Result<serde_json::Value, BayseError> {
+    pub async fn get_ticker(
+        &self,
+        market_id: &str,
+        outcome: Option<&str>,
+        outcome_id: Option<&str>,
+    ) -> Result<serde_json::Value, BayseError> {
+        let mut params = BTreeMap::new();
+        if let Some(o) = outcome {
+            params.insert("outcome".to_string(), o.to_string());
+        }
+        if let Some(oid) = outcome_id {
+            params.insert("outcomeId".to_string(), oid.to_string());
+        }
+        let qs = build_request(&params);
         let endpoint = format!("/v1/pm/markets/{market_id}/ticker");
-        self.client.get(&endpoint, None).await
+        self.client.get(&endpoint, Some(qs)).await
     }
 
     /// Get recent executed trades (CLOB markets only).
@@ -153,27 +176,19 @@ impl MarketDataManager {
     ///
     /// # Parameters
     ///
-    /// * `market_ids` – Optional filter to return trades only for the
-    ///   given market outcome IDs. If omitted all markets are included.
-    /// * `limit` – Optional maximum number of trades to return.
+    /// * `query` – Filters for the trades list: `market_id`, `trade_id`,
+    ///   `order_id`, `outcome_id`, `user_id`, `from_date`, `to_date`,
+    ///   `page`, and `size`. Omit filters to include all markets.
     ///
     /// # Returns
     ///
-    /// A JSON array of recent trades, each with `market_id`, `side`,
-    /// `price`, `size`, `timestamp`, and `trade_id`.
+    /// A JSON object containing an array of recent trades, each with
+    /// `market_id`, `side`, `price`, `size`, `timestamp`, and `trade_id`.
     pub async fn get_trades(
         &self,
-        market_ids: Option<&[&str]>,
-        limit: Option<u32>,
+        query: &TradesQuery,
     ) -> Result<serde_json::Value, BayseError> {
-        let mut params = BTreeMap::new();
-        if let Some(ids) = market_ids {
-            params.insert("marketIds".to_string(), ids.join(","));
-        }
-        if let Some(l) = limit {
-            params.insert("limit".to_string(), l.to_string());
-        }
-        let qs = build_request(&params);
+        let qs = query.to_query_string();
         self.client
             .get(
                 API::MarketData(MarketDataEndpoint::Trades).as_ref(),

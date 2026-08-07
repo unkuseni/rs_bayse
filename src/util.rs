@@ -59,15 +59,16 @@ pub fn to_u64(value: &Value) -> Option<u64> {
     value.as_u64()
 }
 
-/// Current system timestamp in milliseconds since the Unix epoch.
+/// Current system timestamp in **seconds** since the Unix epoch.
 ///
-/// Used to populate the `X-Timestamp` header for signed requests.
+/// Used to populate the `X-Timestamp` header for signed requests — the
+/// Bayse API expects Unix seconds, not milliseconds.
 /// Panics if the system clock is set before the Unix epoch.
 pub fn get_timestamp() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")
-        .as_millis() as u64
+        .as_secs()
 }
 
 /// Generate a random alphanumeric string of the given length.

@@ -34,8 +34,8 @@ impl Bayse for SystemManager {
 impl SystemManager {
     /// Check if the API is running.
     ///
-    /// Returns `Ok(true)` on a successful response, `Ok(false)` on an API error,
-    /// or `Err(BayseError)` on network/parse failures.
+    /// Returns `Ok(HealthResponse)` with `status` `"ok"` on a successful
+    /// response, or `Err(BayseError)` on API / network / parse failures.
     ///
     /// # Examples
     ///
@@ -46,8 +46,7 @@ impl SystemManager {
     /// async fn main() {
     ///     let sys = SystemManager::new(None, None);
     ///     match sys.health().await {
-    ///         Ok(true) => println!("API is healthy"),
-    ///         Ok(false) => println!("API returned an error"),
+    ///         Ok(h) => println!("API is healthy: {}", h.status),
     ///         Err(e) => println!("Check failed: {e}"),
     ///     }
     /// }

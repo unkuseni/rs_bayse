@@ -216,7 +216,7 @@ pub struct Empty {}
 /// let auth = WsAuth::with_api_key("pk_live_...");
 ///
 /// // Authenticate with an access token
-/// let auth = WsAuth::with_access_token("eyJ...", Some("device-123"));
+/// let auth = WsAuth::with_access_token("eyJ...", Some("device-123".to_string()));
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -265,6 +265,12 @@ pub struct BayseApiResponse<T = Value> {
 pub struct HealthResponse {
     /// API health status (e.g. `"ok"`).
     pub status: String,
+}
+
+impl std::fmt::Display for HealthResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.status)
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -891,7 +897,7 @@ pub struct BatchOrderItem {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchPlaceOrdersRequest {
-    /// 1–50 order items.
+    /// 1–20 order items.
     pub orders: Vec<BatchOrderItem>,
 }
 
@@ -1060,6 +1066,75 @@ impl ListOrdersQuery {
         }
         if let Some(ref v) = self.currency {
             params.insert("currency".into(), v.clone());
+        }
+        if let Some(p) = self.page {
+            params.insert("page".into(), p.to_string());
+        }
+        if let Some(s) = self.size {
+            params.insert("size".into(), s.to_string());
+        }
+        build_request(&params)
+    }
+}
+
+// --------------------------------------------------------------------------
+// Trades (market data) types
+// --------------------------------------------------------------------------
+
+/// Query parameters for the trades (market data) endpoint.
+///
+/// All filters are optional; omit them to include all markets.
+#[derive(Debug, Default, Clone)]
+pub struct TradesQuery {
+    /// Filter by market UUID.
+    pub market_id: Option<String>,
+    /// Filter to a specific trade UUID.
+    pub trade_id: Option<String>,
+    /// Filter by order UUID. Matches trades where the order is on
+    /// either the taker or maker side.
+    pub order_id: Option<String>,
+    /// Filter by outcome UUID. Matches trades on either side.
+    pub outcome_id: Option<String>,
+    /// Filter by user UUID. Matches trades where the user was either
+    /// the taker or the maker.
+    pub user_id: Option<String>,
+    /// Only return trades created at or after this RFC3339 timestamp
+    /// (e.g. `2026-02-17T00:00:00Z`).
+    pub from_date: Option<String>,
+    /// Only return trades created at or before this RFC3339 timestamp.
+    pub to_date: Option<String>,
+    /// Page number (1-indexed).
+    pub page: Option<u32>,
+    /// Number of trades per page (max 100).
+    pub size: Option<u32>,
+}
+
+impl TradesQuery {
+    /// Build a URL-encoded query string from the configured filters.
+    ///
+    /// Only fields set to `Some(...)` are included in the output.
+    pub fn to_query_string(&self) -> String {
+        let mut params = BTreeMap::new();
+        if let Some(ref v) = self.market_id {
+            params.insert("marketId".into(), v.clone());
+        }
+        if let Some(ref v) = self.trade_id {
+            params.insert("id".into(), v.clone());
+        }
+        if let Some(ref v) = self.order_id {
+            params.insert("orderId".into(), v.clone());
+        }
+        if let Some(ref v) = self.outcome_id {
+            params.insert("outcomeId".into(), v.clone());
+        }
+        if let Some(ref v) = self.user_id {
+            params.insert("userId".into(), v.clone());
+        }
+        if let Some(ref v) = self.from_date {
+            params.insert("fromDate".into(), v.clone());
+        }
+        if let Some(ref v) = self.to_date {
+            params.insert("toDate".into(), v.clone());
         }
         if let Some(p) = self.page {
             params.insert("page".into(), p.to_string());

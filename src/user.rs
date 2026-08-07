@@ -37,22 +37,33 @@ impl Bayse for UserManager {
 impl UserManager {
     /// Resolve a user tag or ID to their public profile.
     ///
-    /// Requires a session token (`x-auth-token` + `x-device-id`).
+    /// Requires a valid API key (read-level: `X-Public-Key` header).
+    /// Provide exactly one of `tag` or `user_id`.
     ///
     /// # Parameters
     ///
-    /// * `query` – A user tag (e.g. `"@username"`) or user ID to look up.
+    /// * `tag` – The user's tag (username), case-insensitive.
+    /// * `user_id` – The user's UUID.
     ///
     /// # Returns
     ///
-    /// A JSON object with the user's public profile fields, or an error if
-    /// the query does not match any known user.
-    pub async fn lookup_user(&self, query: &str) -> Result<serde_json::Value, BayseError> {
+    /// A JSON object with the user's public profile fields (`id`, `tag`,
+    /// `imageUrl`), or an error if the query does not match any known user.
+    pub async fn lookup_user(
+        &self,
+        tag: Option<&str>,
+        user_id: Option<&str>,
+    ) -> Result<serde_json::Value, BayseError> {
         let mut params = BTreeMap::new();
-        params.insert("q".to_string(), query.to_string());
+        if let Some(t) = tag {
+            params.insert("tag".to_string(), t.to_string());
+        }
+        if let Some(uid) = user_id {
+            params.insert("userId".to_string(), uid.to_string());
+        }
         let qs = build_request(&params);
         self.client
-            .get_session(API::User(UserEndpoint::Lookup).as_ref(), Some(qs))
+            .get_read(API::User(UserEndpoint::Lookup).as_ref(), Some(qs))
             .await
     }
 
@@ -131,7 +142,7 @@ impl UserManager {
     ///
     /// A [`CreateApiKeyResponse`] containing the new key ID, name, timestamps,
     /// public key, secret key, and signing instructions.
-    async fn create_api_key(&self, name: &str) -> Result<CreateApiKeyResponse, BayseError> {
+    pub async fn create_api_key(&self, name: &str) -> Result<CreateApiKeyResponse, BayseError> {
         let body = serde_json::json!({ "name": name });
         let body_str = body.to_string();
         self.client

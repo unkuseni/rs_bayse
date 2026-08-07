@@ -27,13 +27,7 @@
 //!         Some("your_public_key".into()),
 //!         Some("your_secret_key".into()),
 //!     );
-//!     let events = trading
-//!         .list_events(&ListEventsQuery {
-//!             page: Some(1),
-//!             size: Some(20),
-//!             ..Default::default()
-//!         })
-//!         .await?;
+//!     let events = trading.list_events(Some(1), Some(20)).await?;
 //!     for event in &events.events {
 //!         println!("  · {} [{}]", event.title, event.category);
 //!     }
@@ -69,7 +63,7 @@ mod system;
 mod timed;
 mod trading;
 mod user;
-mod util;
+pub mod util;
 mod wallet;
 pub mod ws;
 

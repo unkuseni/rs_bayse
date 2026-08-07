@@ -209,7 +209,7 @@ impl Client {
         let timestamp = get_timestamp().to_string();
 
         let payload = body.clone().unwrap_or_default();
-        let signature = self.sign_message(&timestamp, endpoint, &payload);
+        let signature = self.sign_message("POST", &timestamp, endpoint, &payload);
 
         let mut req = self
             .inner_client
@@ -236,7 +236,7 @@ impl Client {
     ) -> Result<T, BayseError> {
         let url = self.build_url(endpoint, query);
         let timestamp = get_timestamp().to_string();
-        let signature = self.sign_message(&timestamp, endpoint, "");
+        let signature = self.sign_message("DELETE", &timestamp, endpoint, "");
 
         let req = self
             .inner_client
@@ -325,22 +325,35 @@ impl Client {
 
     /// Build the HMAC-SHA256 signature for write-level requests.
     ///
-    /// The signed message is formed by concatenating:
-    /// `timestamp + HTTP_method + endpoint + body`.
+    /// Implements the documented signing scheme:
     ///
-    /// The resulting signature is hex-encoded. An empty string is used
-    /// as the key material when `secret_key` is `None`, which will
-    /// produce a non-functional signature (the server will reject it).
-    fn sign_message(&self, timestamp: &str, endpoint: &str, body: &str) -> String {
+    /// `payload = "{timestamp}.{METHOD}.{path}.{bodyHash}"`
+    ///
+    /// * `timestamp` – Unix seconds, matching the `X-Timestamp` header.
+    /// * `METHOD` – uppercase HTTP method (`POST`, `DELETE`, …).
+    /// * `path` – the request path (e.g. `/v1/pm/orders/{orderId}`).
+    /// * `bodyHash` – SHA-256 hex digest of the raw request body, or an
+    ///   empty string when there is no body (payload ends with a dot).
+    ///
+    /// The `X-Signature` value is the **base64** encoding of the
+    /// HMAC-SHA256 digest of the payload, keyed with the secret key.
+    fn sign_message(&self, method: &str, timestamp: &str, endpoint: &str, body: &str) -> String {
         let secret = self.secret_key.as_deref().unwrap_or("");
-        let message = format!("{}{}{}{}", timestamp, "POST", endpoint, body);
+        let body_hash = if body.is_empty() {
+            String::new()
+        } else {
+            use sha2::Digest;
+            hex_encode(Sha256::digest(body.as_bytes()).as_slice())
+        };
+        let message = format!("{timestamp}.{method}.{endpoint}.{body_hash}");
 
         let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).expect("HMAC key length");
         use hmac::Mac;
         mac.update(message.as_bytes());
-        let result = mac.finalize();
-        let code = result.into_bytes();
-        hex_encode(code.as_slice())
+        let code = mac.finalize().into_bytes();
+
+        use base64::Engine as _;
+        base64::engine::general_purpose::STANDARD.encode(code.as_slice())
     }
 
     /// Send the request and deserialise the response.
@@ -383,5 +396,45 @@ impl Client {
     /// custom HTTP requests while still using the same connection pool.
     pub fn inner(&self) -> &ReqwestClient {
         &self.inner_client
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sign_message_matches_docs_scheme() {
+        let client = Client::new(
+            Some("pk_live_abcdef123456".into()),
+            Some("sk_live_secret789xyz".into()),
+            "https://relay.bayse.markets".into(),
+            None,
+            None,
+        );
+
+        // POST with a JSON body: payload = {ts}.POST.{path}.{sha256-hex(body)},
+        // signature = base64(HMAC-SHA256(payload, secret)).
+        let body =
+            r#"{"side":"BUY","outcomeId":"abc","amount":100,"type":"MARKET","currency":"USD"}"#;
+        let sig = client.sign_message(
+            "POST",
+            "1730000000",
+            "/v1/pm/events/evt_123/markets/mkt_456/orders",
+            body,
+        );
+        assert_eq!(sig, "eHnnuHkCoYh6RWaXzb1MGrbjnuvENAUXpeEFs9Guano=");
+
+        // DELETE with no body: bodyHash is empty, payload ends with a dot.
+        let sig = client.sign_message("DELETE", "1730000000", "/v1/pm/orders/ord_1", "");
+        assert_eq!(sig, "P3zqZRSqwC5MFKtA1QIO+/tNKw+V1JTZCVgOpJ8YEIQ=");
+    }
+
+    #[test]
+    fn timestamp_is_unix_seconds() {
+        // Unix seconds are ~10 digits; milliseconds would be ~13.
+        let ts = get_timestamp();
+        assert!(ts < 1_000_000_000_000, "timestamp must be seconds, got {ts}");
+        assert!(ts > 1_000_000_000, "timestamp must be seconds, got {ts}");
     }
 }

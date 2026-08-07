@@ -79,7 +79,7 @@ impl Stream {
         let mut ws_client = WsClient::new(self.client.wss_connect("/ws/v1/markets").await?);
         let sub_msg = serde_json::to_string(&subscription)?;
         ws_client.send_text(&sub_msg).await?;
-        Self::event_loop(&mut ws_client, handler, None).await
+        Self::event_loop(&mut ws_client, handler, None, None).await
     }
 
     /// Subscribe to **market data** with dynamic subscription control.
@@ -105,7 +105,7 @@ impl Stream {
         let mut ws_client = WsClient::new(self.client.wss_connect("/ws/v1/markets").await?);
         let sub_msg = serde_json::to_string(&subscription)?;
         ws_client.send_text(&sub_msg).await?;
-        Self::event_loop(&mut ws_client, handler, Some(cmd_rx)).await
+        Self::event_loop(&mut ws_client, handler, Some(cmd_rx), None).await
     }
 
     /// Subscribe to **user order updates** (`/ws/v1/user`).
@@ -131,7 +131,10 @@ impl Stream {
         let mut ws_client = WsClient::new(self.client.wss_connect("/ws/v1/user").await?);
         let sub_msg = serde_json::to_string(&subscription)?;
         ws_client.send_text(&sub_msg).await?;
-        Self::event_loop(&mut ws_client, handler, None).await
+        // Every message on this endpoint must carry auth, including the
+        // periodic keepalive pings.
+        let ping_auth = subscription.auth.clone();
+        Self::event_loop(&mut ws_client, handler, None, ping_auth).await
     }
 
     /// Subscribe to **user order updates** with dynamic subscription control.
@@ -150,7 +153,10 @@ impl Stream {
         let mut ws_client = WsClient::new(self.client.wss_connect("/ws/v1/user").await?);
         let sub_msg = serde_json::to_string(&subscription)?;
         ws_client.send_text(&sub_msg).await?;
-        Self::event_loop(&mut ws_client, handler, Some(cmd_rx)).await
+        // Every message on this endpoint must carry auth, including the
+        // periodic keepalive pings.
+        let ping_auth = subscription.auth.clone();
+        Self::event_loop(&mut ws_client, handler, Some(cmd_rx), ping_auth).await
     }
 
     /// Subscribe to **real-time asset prices** (`/ws/v1/realtime`).
@@ -172,7 +178,7 @@ impl Stream {
         let mut ws_client = WsClient::new(self.client.wss_connect("/ws/v1/realtime").await?);
         let sub_msg = serde_json::to_string(&subscription)?;
         ws_client.send_text(&sub_msg).await?;
-        Self::event_loop(&mut ws_client, handler, None).await
+        Self::event_loop(&mut ws_client, handler, None, None).await
     }
 
     // ------------------------------------------------------------------
@@ -189,10 +195,16 @@ impl Stream {
     /// # Type Parameters
     ///
     /// * `H` – A [`WebSocketHandler`] that processes parsed [`WsEvent`] values.
+    ///
+    /// # Parameters
+    ///
+    /// * `ping_auth` – Credentials attached to periodic keepalive pings.
+    ///   Required on `/ws/v1/user` where every message must carry `auth`.
     async fn event_loop<H>(
         client: &mut WsClient,
         mut handler: H,
         mut cmd_rx: Option<mpsc::UnboundedReceiver<SubscriptionCommand>>,
+        ping_auth: Option<WsAuth>,
     ) -> Result<(), BayseError>
     where
         H: WebSocketHandler,
@@ -226,7 +238,10 @@ impl Stream {
 
             // ----- Ping keepalive -----
             if last_ping.elapsed() > PING_INTERVAL {
-                let ping = WsSubscription::ping();
+                let mut ping = WsSubscription::ping();
+                if let Some(ref auth) = ping_auth {
+                    ping.auth = Some(auth.clone());
+                }
                 let msg = serde_json::to_string(&ping)?;
                 client.send_text(&msg).await?;
                 last_ping = Instant::now();

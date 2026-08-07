@@ -64,14 +64,20 @@ async fn run_public_examples() -> Result<(), BayseError> {
 
     // --- Market Data: Order Book ---
     println!("\n▶ Order Book:");
-    match market_data.get_order_book(&["market_id_1"], Some(5)).await {
+    match market_data
+        .get_order_book(&["market_id_1"], Some(5), None)
+        .await
+    {
         Ok(book) => println!("  Order book: {book:#?}"),
         Err(e) => println!("  Error: {e}"),
     }
 
     // --- Market Data: Ticker ---
     println!("\n▶ Ticker:");
-    match market_data.get_ticker("example_market_id").await {
+    match market_data
+        .get_ticker("example_market_id", Some("YES"), None)
+        .await
+    {
         Ok(ticker) => println!("  Ticker: {ticker:#?}"),
         Err(e) => println!("  Error: {e}"),
     }
@@ -79,7 +85,11 @@ async fn run_public_examples() -> Result<(), BayseError> {
     // --- Market Data: Trades ---
     println!("\n▶ Recent Trades:");
     match market_data
-        .get_trades(Some(&["market_id_1"]), Some(10))
+        .get_trades(&TradesQuery {
+            market_id: Some("market_id_1".into()),
+            size: Some(10),
+            ..Default::default()
+        })
         .await
     {
         Ok(trades) => println!("  Trades: {trades:#?}"),

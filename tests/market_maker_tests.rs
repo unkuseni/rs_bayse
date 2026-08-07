@@ -1,9 +1,13 @@
 use bayse::{Bayse, MarketMakerManager};
 
+// NOTE: Live integration tests against the production Bayse API. Ignored by
+// default so `cargo test` stays hermetic; run with a real API key via:
+//     cargo test --test market_maker_tests -- --ignored
 const API_KEY: &str = "";
 const SECRET_KEY: &str = "";
 
 #[tokio::test]
+#[ignore]
 async fn test_get_liquidity_rewards() {
     let mm: MarketMakerManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     match mm.get_liquidity_rewards(Some(1), Some(10)).await {
@@ -27,6 +31,7 @@ async fn test_get_liquidity_rewards() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_active_liquidity_rewards() {
     let mm: MarketMakerManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     match mm.get_active_liquidity_rewards().await {
@@ -44,6 +49,7 @@ async fn test_get_active_liquidity_rewards() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_maker_rebates() {
     let mm: MarketMakerManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     match mm.get_maker_rebates(Some(1), Some(10)).await {
@@ -67,6 +73,7 @@ async fn test_get_maker_rebates() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_active_maker_rebates() {
     let mm: MarketMakerManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     match mm.get_active_maker_rebates().await {

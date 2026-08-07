@@ -4,6 +4,10 @@ use bayse::{
     PlaceOrderRequest, TradingManager,
 };
 
+// NOTE: These are live integration tests against the production Bayse API.
+// They are ignored by default so `cargo test` stays hermetic; run them with
+// real credentials via:
+//     cargo test --test trading_tests -- --ignored
 const API_KEY: &str = "";
 const SECRET_KEY: &str = "";
 
@@ -12,6 +16,7 @@ const SECRET_KEY: &str = "";
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
+#[ignore]
 async fn test_list_events() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     match trader.list_events(None, Some(3)).await {
@@ -38,6 +43,7 @@ async fn test_list_events() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_filter_for_crypto() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     match trader.list_events(None, None).await {
@@ -53,6 +59,7 @@ async fn test_filter_for_crypto() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_event() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let event_id = "";
@@ -63,6 +70,7 @@ async fn test_get_event() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_event_by_slug() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let slug = "";
@@ -73,6 +81,7 @@ async fn test_get_event_by_slug() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_list_series() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     match trader.list_series(None, None).await {
@@ -82,6 +91,7 @@ async fn test_list_series() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_series_events() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let series_id = "";
@@ -96,6 +106,7 @@ async fn test_get_series_events() {
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
+#[ignore]
 async fn test_get_quote() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let (event_id, market_id) = ("", "");
@@ -112,6 +123,7 @@ async fn test_get_quote() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_place_order() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let (event_id, market_id) = ("", "");
@@ -135,6 +147,7 @@ async fn test_place_order() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_batch_place_orders() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let req = BatchPlaceOrdersRequest {
@@ -164,6 +177,7 @@ async fn test_batch_place_orders() {
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
+#[ignore]
 async fn test_get_portfolio() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     match trader.get_portfolio().await {
@@ -189,6 +203,7 @@ async fn test_get_portfolio() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_pnl() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let query = GetPnLQuery {
@@ -218,6 +233,7 @@ async fn test_get_pnl() {
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
+#[ignore]
 async fn test_list_orders() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let query = ListOrdersQuery {
@@ -249,6 +265,7 @@ async fn test_list_orders() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_order() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let order_id = "";
@@ -259,6 +276,7 @@ async fn test_get_order() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_cancel_order() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let order_id = "";
@@ -269,6 +287,7 @@ async fn test_cancel_order() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_batch_cancel_orders() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let req = BatchCancelOrdersRequest { order_ids: vec![] };
@@ -288,6 +307,7 @@ async fn test_batch_cancel_orders() {
 /// ------------------------------------------------------------------
 
 #[tokio::test]
+#[ignore]
 async fn test_batch_amend_orders() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let req = BatchAmendOrdersRequest {
@@ -313,6 +333,7 @@ async fn test_batch_amend_orders() {
 // ------------------------------------------------------------------
 
 #[tokio::test]
+#[ignore]
 async fn test_mint_shares() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let market_id = "";
@@ -327,6 +348,7 @@ async fn test_mint_shares() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_burn_shares() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
     let market_id = "";
@@ -341,9 +363,10 @@ async fn test_burn_shares() {
 }
 
 #[tokio::test]
+#[ignore]
 async fn test_get_activities() {
     let trader: TradingManager = Bayse::new(Some(API_KEY.into()), Some(SECRET_KEY.into()));
-    match trader.get_activities(Some(1), Some(10)).await {
+    match trader.get_activities(None, Some(1), Some(10)).await {
         Ok(activities) => println!("{:#?}", activities),
         Err(e) => panic!("{:?}", e),
     }

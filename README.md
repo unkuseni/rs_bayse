@@ -29,7 +29,7 @@
 ### REST API
 - **System** — Health check, version info
 - **User** — Lookup, login, API key management (create, list, revoke, rotate)
-- **Trading** — Events, quotes, order placement (single & batch), portfolio, PnL, orders, mint/burn shares, activities
+- **Trading** — Events, quotes, order placement (single & batch), portfolio, PnL, orders, mint/burn shares, activities, sports markets (games, leagues, teams)
 - **Wallet** — Asset balances
 - **Market Data** — Price history, order book, ticker, trades
 - **Market Makers** — Liquidity rewards & maker rebates
@@ -81,7 +81,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rs_bayse = "0.1.0"
+rs_bayse = "0.1.1"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -126,20 +126,30 @@ async fn main() -> Result<(), BayseError> {
 
     // Price history
     let prices = market_data
-        .get_price_history("event_id", None, None, None)
+        .get_price_history("event_id", Some("24H"), None, None)
         .await?;
     println!("Prices: {prices:#?}");
 
-    // Order book
-    let ob = market_data.get_order_book(&["market_id"], Some(10)).await?;
+    // Order book (CLOB markets)
+    let ob = market_data
+        .get_order_book(&["outcome_id"], Some(10), None)
+        .await?;
     println!("Order book: {ob:#?}");
 
     // Ticker
-    let ticker = market_data.get_ticker("market_id").await?;
+    let ticker = market_data
+        .get_ticker("market_id", Some("YES"), None)
+        .await?;
     println!("Ticker: {ticker:#?}");
 
     // Recent trades
-    let trades = market_data.get_trades(Some(&["market_id"]), Some(50)).await?;
+    let trades = market_data
+        .get_trades(&TradesQuery {
+            market_id: Some("market_id".into()),
+            size: Some(50),
+            ..Default::default()
+        })
+        .await?;
     println!("Trades: {trades:#?}");
 
     Ok(())
@@ -176,11 +186,19 @@ async fn main() -> Result<(), BayseError> {
         .place_order(
             "event_id",
             "market_id",
-            serde_json::json!({
-                "side": "buy",
-                "quantity": 10,
-                "price": 0.55,
-            }),
+            &PlaceOrderRequest {
+                side: "BUY".into(),
+                outcome_id: "outcome_id".into(),
+                amount: 100.0,
+                order_type: "LIMIT".into(),
+                currency: Some("USD".into()),
+                price: Some(0.55),
+                time_in_force: Some("GTC".into()),
+                post_only: None,
+                stp_mode: None,
+                max_slippage: None,
+                expires_at: None,
+            },
         )
         .await?;
     println!("Order: {order:#?}");
@@ -220,14 +238,12 @@ async fn main() {
     let api_key = std::env::var("BAYSE_API_KEY").unwrap();
     let ws: Stream = Bayse::new(Some(api_key.clone()), None);
 
-    let auth_msg = serde_json::json!({
-        "type": "auth",
-        "apiKey": api_key,
-    }).to_string();
+    // Every message on the user endpoint must carry auth credentials.
+    let sub = WsSubscription::new("subscribe", "orders")
+        .with_market_ids(vec!["market_id".into()])
+        .with_auth(WsAuth::with_api_key(api_key));
 
-    let sub = WsSubscription::new("subscribe", "orders");
-
-    ws.subscribe_user(auth_msg, sub, |msg| {
+    ws.subscribe_user(sub, |msg| {
         println!("Order update: {msg:#?}");
         Ok::<_, std::io::Error>(())
     })
