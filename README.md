@@ -161,7 +161,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-rs_bayse = "0.1.1"
+rs_bayse = "0.2.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
